@@ -4,6 +4,7 @@
 #include "VX_Sim.h"
 #include "VX_SimGA.h"
 
+typedef std::vector<float> array_voxel_pressure;
 
 int main(int argc, char *argv[])
 {
@@ -75,6 +76,8 @@ int main(int argc, char *argv[])
 		DeformableMesh.printAllMeshInfo();
 	}
 
+	int number_of_vox = Simulator.NumVox();
+	std::vector<array_voxel_pressure> voxel_pressure_history;
 
 	while (not Simulator.StopConditionMet())
 	{
@@ -98,6 +101,19 @@ int main(int argc, char *argv[])
 		Step += 1;	//increment the step counter
 		Time += Simulator.dt;	//update the sim tim after the step
 		Simulator.pEnv->UpdateCurTemp(Time);	//pass in the global time, and a pointer to the local object so its material temps can be modified (nac: pointer removed for debugging)	
+
+		// do some reporting via the stdoutput if required:
+		if (Step%2000 == 0) //Only output every n time steps
+		{
+			array_voxel_pressure local_array;
+			
+			for (int i=0; i<number_of_vox; i++)
+			{
+				int index=Simulator.XtoSIndexMap[i];
+				local_array.push_back(Simulator.VoxArray[index].GetPressure());
+			}
+			voxel_pressure_history.push_back(local_array);
+		}
 	}
 
 	hulVolumeEnd = DeformableMesh.computeAndStoreQHullEnd();
@@ -114,7 +130,23 @@ int main(int argc, char *argv[])
 	}	
 
 	if (print_scrn) std::cout << "Ended at: " << Time << std::endl;
+
+	std::ofstream myfile;
+	myfile.open("pressures.csv");
+
+
+	for(int i=0;i<voxel_pressure_history.size();i++)
+	{
+		for(int j=0;j<number_of_vox;j++)
+		{
+			myfile <<voxel_pressure_history[i][j];
+			myfile <<" ,"; 
+		}
+		myfile<<" \n";
 	
+	}
+	myfile.close();	
+
 	Simulator.SaveResultFile(Simulator.FitnessFileName);
 
 	return 1;	//code for successful completion  // could return fitness value if greater efficiency is desired
